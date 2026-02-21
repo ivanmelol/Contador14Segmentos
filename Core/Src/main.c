@@ -31,7 +31,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define limite_tiempo 20
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -40,20 +40,75 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
-
+int milis=0;
+int tiempo_inicio=0;
+int tiempo_fin=0;
+int estado=0;
+int distancia=0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_TIM1_Init(void);
+static void MX_TIM2_Init(void);
+static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+	//Leer timer 1
+    if(htim->Instance == TIM2)
+    {
+        // Esto ocurre cada 1 ms
+    	 milis++;
+    }
+
+    //leer timer 2
+    if(htim->Instance == TIM3)
+    {
+        if(estado == 0)
+        {
+            tiempo_inicio = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
+            __HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_1, TIM_INPUTCHANNELPOLARITY_FALLING);
+            estado = 1;
+        }
+        else
+        {
+            tiempo_fin = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
+
+            uint32_t tiempo_pulso = tiempo_fin - tiempo_inicio;
+
+            distancia = tiempo_pulso / 58;
+
+            __HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_1, TIM_INPUTCHANNELPOLARITY_RISING);
+            estado = 0;
+        }
+    }
+}
+
+void delay_us(uint16_t us)
+{
+    __HAL_TIM_SET_COUNTER(&htim4, 0);
+    while (__HAL_TIM_GET_COUNTER(&htim4) < us);
+}
+
+//funcion para prender el sensor
+void HCSR04_Trigger(void)
+{
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
+    delay_us(10);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+}
 
 /* USER CODE END 0 */
 
@@ -83,6 +138,8 @@ int main(void)
   int centenas=0;
   int miles=0;
 
+
+  int T=0;
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -94,8 +151,13 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_TIM1_Init();
+  MX_TIM2_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
-
+  //HAL_TIM_Base_Start(&htim2); //Se usa la librearia HAL TIM (de Timers) para prender el Timer, &htim2 es el puntureo al timer 2
+  HAL_TIM_Base_Start_IT(&htim2); //Se usa la libreri HAL TIM para iniciarl el timer pero con interrupciones
+  HAL_TIM_Base_Start_IT(&htim4);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -109,51 +171,61 @@ int main(void)
 	  //HAL_GPIO_TogglePin (GPIOB, LEDB_Pin);
 	  //GPIOA->BSRR = numeros[i];
 	  //GPIOA->ODR = (GPIOA->ODR & ~0x007F) | numeros[i];
-	  HAL_Delay(20);
-	  contAux++;
-	  if(contAux==200){
-		  unidades++;
-		  contAux=0;
-	  }
-	  if(unidades>9){
-		  unidades=0;
-		  decenas++;
-	  }
-	  if(decenas>9){
-		  decenas=0;
-		  centenas++;
-	  }
-	  if(centenas>9){
-		  centenas=0;
-		  miles++;
-	  }
-	  if(miles>9){
-		  miles=0;
-	  }
 
-	  //Prender transistores
-	  switch(cont){
-	  	  case 0:
-	  		  GPIOA->ODR = (GPIOA->ODR & ~0x007F) | numeros[miles];
-	  		  GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 14;
-	  		  break;
-	  	  case 1:
-	  		GPIOA->ODR = (GPIOA->ODR & ~0x007F) | numeros[centenas];
-	  		GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 13;
-	  		  break;
-	  	  case 2:
-	  		GPIOA->ODR = (GPIOA->ODR & ~0x007F) | numeros[decenas];
-	  		GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 11;
-	  		  break;
-	  	  case 3:
-	  		GPIOA->ODR = (GPIOA->ODR & ~0x007F) | numeros[unidades];
-	  		GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 7;
-	  		  break;
 
-	  }
-	  cont++;
-	  if(cont>3)
-		  cont=0;
+
+
+	   if(milis==limite_tiempo){
+		   //HAL_Delay(20);
+		      //HCSR04_Trigger();
+		   	  contAux++;
+		   	  if(contAux==200){
+		   		  unidades++;
+		   		  contAux=0;
+		   	  }
+		   	  if(unidades>9){
+		   		  unidades=0;
+		   		  decenas++;
+		   	  }
+		   	  if(decenas>9){
+		   		  decenas=0;
+		   		  centenas++;
+		   	  }
+		   	  if(centenas>9){
+		   		  centenas=0;
+		   		  miles++;
+		   	  }
+		   	  if(miles>9){
+		   		  miles=0;
+		   	  }
+
+		   	  //Prender transistores
+		   	  switch(cont){
+		   	  	  case 0:
+		   	  		  GPIOA->ODR = (GPIOA->ODR & ~0x007F) | numeros[miles];
+		   	  		  GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 14;
+		   	  		  break;
+		   	  	  case 1:
+		   	  		GPIOA->ODR = (GPIOA->ODR & ~0x007F) | numeros[centenas];
+		   	  		GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 13;
+		   	  		  break;
+		   	  	  case 2:
+		   	  		GPIOA->ODR = (GPIOA->ODR & ~0x007F) | numeros[decenas];
+		   	  		GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 11;
+		   	  		  break;
+		   	  	  case 3:
+		   	  		GPIOA->ODR = (GPIOA->ODR & ~0x007F) | numeros[unidades];
+		   	  		GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 7;
+		   	  		  break;
+
+		   	  }
+		   	  cont++;
+		   	  if(cont>3)
+		   		  cont=0;
+		 	   milis=0;
+	   }
+
+
 
   }
   /* USER CODE END 3 */
@@ -199,6 +271,158 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
+
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_IC_InitTypeDef sConfigIC = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 0;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 65535;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_IC_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 0;
+  if (HAL_TIM_IC_ConfigChannel(&htim1, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
+
+  /* USER CODE END TIM1_Init 2 */
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 71;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 10000;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
+  * @brief TIM4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM4_Init(void)
+{
+
+  /* USER CODE BEGIN TIM4_Init 0 */
+
+  /* USER CODE END TIM4_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_IC_InitTypeDef sConfigIC = {0};
+
+  /* USER CODE BEGIN TIM4_Init 1 */
+
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 0;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 65535;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_IC_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 0;
+  if (HAL_TIM_IC_ConfigChannel(&htim4, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM4_Init 2 */
+
+  /* USER CODE END TIM4_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -226,7 +450,8 @@ static void MX_GPIO_Init(void)
                           |t_Pin|u_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, Q0_Pin|Q1_Pin|Q2_Pin|Q3_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, Q0_Pin|Q1_Pin|Q2_Pin|Q3_Pin
+                          |GPIO_PIN_5, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : LED_Pin */
   GPIO_InitStruct.Pin = LED_Pin;
@@ -248,8 +473,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : Q0_Pin Q1_Pin Q2_Pin Q3_Pin */
-  GPIO_InitStruct.Pin = Q0_Pin|Q1_Pin|Q2_Pin|Q3_Pin;
+  /*Configure GPIO pins : Q0_Pin Q1_Pin Q2_Pin Q3_Pin
+                           PB5 */
+  GPIO_InitStruct.Pin = Q0_Pin|Q1_Pin|Q2_Pin|Q3_Pin
+                          |GPIO_PIN_5;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
