@@ -31,7 +31,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define limite_tiempo 20
+#define limite_tiempo 1
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -73,8 +73,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     	 milis++;
     }
 
-    //leer timer 2
-    if(htim->Instance == TIM3)
+}
+
+
+
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
+{
+    if(htim->Instance == TIM4)
     {
         if(estado == 0)
         {
@@ -86,9 +91,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         {
             tiempo_fin = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
 
-            uint32_t tiempo_pulso = tiempo_fin - tiempo_inicio;
+            uint32_t tiempo_pulso;
 
-            distancia = tiempo_pulso / 58;
+            if(tiempo_fin >= tiempo_inicio)
+            {
+                tiempo_pulso = tiempo_fin - tiempo_inicio;
+            }
+            else
+            {
+                tiempo_pulso = (0xFFFF - tiempo_inicio) + tiempo_fin;
+            }
+
+            distancia = tiempo_pulso/58;
 
             __HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_1, TIM_INPUTCHANNELPOLARITY_RISING);
             estado = 0;
@@ -108,6 +122,29 @@ void HCSR04_Trigger(void)
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
     delay_us(10);
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+}
+
+
+//Funcion para optener miles
+int getMiles(int numero){
+	return ((int)numero/1000);
+}
+
+
+//Funcion para optener cientos
+int getCientos(int numero, int miles){
+	return ((int)(numero-miles)/100);
+}
+
+//Funcion para optener unidades
+int getDecenas(int numero, int miles, int cientos){
+	return ((int)(numero-(miles+cientos))/10);
+}
+
+
+//funcion para optener unidades
+int getUnidades(int numero, int miles, int cientos, int decenas){
+	return (int)(numero-(miles+cientos+decenas));
 }
 
 /* USER CODE END 0 */
@@ -157,7 +194,8 @@ int main(void)
   /* USER CODE BEGIN 2 */
   //HAL_TIM_Base_Start(&htim2); //Se usa la librearia HAL TIM (de Timers) para prender el Timer, &htim2 es el puntureo al timer 2
   HAL_TIM_Base_Start_IT(&htim2); //Se usa la libreri HAL TIM para iniciarl el timer pero con interrupciones
-  HAL_TIM_Base_Start_IT(&htim4);
+  //HAL_TIM_Base_Start_IT(&htim4);
+  HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -178,8 +216,8 @@ int main(void)
 	   if(milis==limite_tiempo){
 		   //HAL_Delay(20);
 		      //HCSR04_Trigger();
-		   	  contAux++;
-		   	  if(contAux==200){
+		   	  /*contAux++;
+		   	  if(contAux==10){
 		   		  unidades++;
 		   		  contAux=0;
 		   	  }
@@ -197,31 +235,51 @@ int main(void)
 		   	  }
 		   	  if(miles>9){
 		   		  miles=0;
-		   	  }
+		   	  }*/
+		     //distancia=589;
+		   	 contAux=distancia;
+		   	 miles=getMiles(contAux);
+		   	 centenas=getCientos(contAux,miles*1000);
+		   	 decenas=getDecenas(contAux,miles*1000,centenas*100);
+		   	 unidades=getUnidades(contAux,miles*1000,centenas*100,decenas*10);
 
+
+
+		   	 GPIOA->ODR = (GPIOA->ODR & ~0x007F) | 0;
 		   	  //Prender transistores
 		   	  switch(cont){
 		   	  	  case 0:
 		   	  		  GPIOA->ODR = (GPIOA->ODR & ~0x007F) | numeros[miles];
-		   	  		  GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 14;
+
+		   	  		  //GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 14;
+		   	  		  GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 1;
 		   	  		  break;
 		   	  	  case 1:
 		   	  		GPIOA->ODR = (GPIOA->ODR & ~0x007F) | numeros[centenas];
-		   	  		GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 13;
+
+		   	  		//GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 13;
+		   	  	    GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 2;
 		   	  		  break;
 		   	  	  case 2:
 		   	  		GPIOA->ODR = (GPIOA->ODR & ~0x007F) | numeros[decenas];
-		   	  		GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 11;
+
+		   	  		//GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 11;
+		   	  	    GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 4;
 		   	  		  break;
 		   	  	  case 3:
 		   	  		GPIOA->ODR = (GPIOA->ODR & ~0x007F) | numeros[unidades];
-		   	  		GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 7;
+
+		   	  		//GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 7;
+		   	  	    GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 8;
 		   	  		  break;
 
 		   	  }
 		   	  cont++;
-		   	  if(cont>3)
+		   	  if(cont>3){
 		   		  cont=0;
+		   		 HCSR04_Trigger();
+		   	  }
+
 		 	   milis=0;
 	   }
 
