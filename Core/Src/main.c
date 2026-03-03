@@ -42,6 +42,7 @@
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
@@ -58,6 +59,7 @@ static void MX_GPIO_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM4_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -147,6 +149,20 @@ int getUnidades(int numero, int miles, int cientos, int decenas){
 	return (int)(numero-(miles+cientos+decenas));
 }
 
+
+void Configurar_PWM_PB4(void)
+{
+	   GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+	    __HAL_RCC_GPIOB_CLK_ENABLE();
+	    __HAL_RCC_AFIO_CLK_ENABLE();
+
+	    GPIO_InitStruct.Pin = GPIO_PIN_4;
+	    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+	    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+
+	    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+}
 /* USER CODE END 0 */
 
 /**
@@ -191,11 +207,18 @@ int main(void)
   MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM4_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
+  __HAL_AFIO_REMAP_TIM3_PARTIAL();
   //HAL_TIM_Base_Start(&htim2); //Se usa la librearia HAL TIM (de Timers) para prender el Timer, &htim2 es el puntureo al timer 2
   HAL_TIM_Base_Start_IT(&htim2); //Se usa la libreri HAL TIM para iniciarl el timer pero con interrupciones
   //HAL_TIM_Base_Start_IT(&htim4);
   HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+  Configurar_PWM_PB4();
+
+  TIM3->CCR1 = 500;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -211,7 +234,10 @@ int main(void)
 	  //GPIOA->ODR = (GPIOA->ODR & ~0x007F) | numeros[i];
 
 
-
+	  //uint32_t duty = (__HAL_TIM_GET_AUTORELOAD(&htim3) + 1) * 0.5;
+	 // __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, duty);
+	  //__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 500);// CCR1 = 500;
+	  TIM3->CCR1 = 500; //a la antigual
 
 	   if(milis==limite_tiempo){
 		   //HAL_Delay(20);
@@ -258,7 +284,7 @@ int main(void)
 		   	  		GPIOA->ODR = (GPIOA->ODR & ~0x007F) | numeros[centenas];
 
 		   	  		//GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 13;
-		   	  	    GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 2;
+		   	  	     GPIOB->ODR = (GPIOB->ODR & ~0x00F) | 2;
 		   	  		  break;
 		   	  	  case 2:
 		   	  		GPIOA->ODR = (GPIOA->ODR & ~0x007F) | numeros[decenas];
@@ -419,6 +445,65 @@ static void MX_TIM2_Init(void)
   /* USER CODE BEGIN TIM2_Init 2 */
 
   /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 71;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 999;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 499;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+  HAL_TIM_MspPostInit(&htim3);
 
 }
 
