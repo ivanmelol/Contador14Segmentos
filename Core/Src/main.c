@@ -152,7 +152,7 @@ int getUnidades(int numero, int miles, int cientos, int decenas){
 
 void Configurar_PWM_PB4(void)
 {
-	   GPIO_InitTypeDef GPIO_InitStruct = {0};
+	  /* GPIO_InitTypeDef GPIO_InitStruct = {0};
 
 	    __HAL_RCC_GPIOB_CLK_ENABLE();
 	    __HAL_RCC_AFIO_CLK_ENABLE();
@@ -161,7 +161,18 @@ void Configurar_PWM_PB4(void)
 	    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
 	    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
 
-	    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+	    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);*/
+
+
+	    GPIO_InitTypeDef GPIO_InitStruct = {0};
+	        __HAL_RCC_GPIOB_CLK_ENABLE();
+
+	        GPIO_InitStruct.Pin = GPIO_PIN_4;
+	        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP; // Push-Pull Alterno para PWM
+	        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+	        HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+
 }
 /* USER CODE END 0 */
 
@@ -209,15 +220,35 @@ int main(void)
   MX_TIM4_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-  __HAL_AFIO_REMAP_TIM3_PARTIAL();
-  //HAL_TIM_Base_Start(&htim2); //Se usa la librearia HAL TIM (de Timers) para prender el Timer, &htim2 es el puntureo al timer 2
-  HAL_TIM_Base_Start_IT(&htim2); //Se usa la libreri HAL TIM para iniciarl el timer pero con interrupciones
-  //HAL_TIM_Base_Start_IT(&htim4);
-  HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-  Configurar_PWM_PB4();
+  // 1. Habilitar reloj AFIO (necesario para remaps y liberar JTAG)
+    __HAL_RCC_AFIO_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
 
-  TIM3->CCR1 = 500;
+    // 2. Liberar PB4 (el pin por defecto es JTAG-NJTRST)
+    __HAL_AFIO_REMAP_SWJ_NOJTAG();
+
+    // 3. Hacer el remap parcial del TIM3 para que CH1 salga por PB4
+    __HAL_AFIO_REMAP_TIM3_ENABLE();
+
+    // 4. Configurar el pin físicamente como Función Alterna
+  //  Configurar_PWM_PB4();
+
+    // 4. Configuración manual del pin como Salida de Función Alterna
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_4;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    // 5. Iniciar el Timer en modo PWM
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+
+    // 6. Iniciar los demás periféricos
+    HAL_TIM_Base_Start_IT(&htim2);
+    HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1);
+
+    // 7. Establecer el valor del Duty Cycle
+    TIM3->CCR1 = 500;
 
   /* USER CODE END 2 */
 
@@ -237,7 +268,7 @@ int main(void)
 	  //uint32_t duty = (__HAL_TIM_GET_AUTORELOAD(&htim3) + 1) * 0.5;
 	 // __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, duty);
 	  //__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 500);// CCR1 = 500;
-	  TIM3->CCR1 = 500; //a la antigual
+	  TIM3->CCR1 = distancia; //a la antigual
 
 	   if(milis==limite_tiempo){
 		   //HAL_Delay(20);
@@ -503,7 +534,7 @@ static void MX_TIM3_Init(void)
   /* USER CODE BEGIN TIM3_Init 2 */
 
   /* USER CODE END TIM3_Init 2 */
-  HAL_TIM_MspPostInit(&htim3);
+  //HAL_TIM_MspPostInit(&htim3);
 
 }
 
